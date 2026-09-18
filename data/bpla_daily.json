@@ -1,8 +1,8 @@
 {
  "meta": {
   "window": 14,
-  "whole_slope_end": -22.10667229889176,
-  "updated": "2026-09-18 20:12"
+  "whole_slope_end": -22.106672298891805,
+  "updated": "2026-09-18 20:14"
  },
  "data": [
   {
@@ -17,7 +17,7 @@
    "bpla_24h": 1158,
    "rolling_level": NaN,
    "rolling_slope": NaN,
-   "whole_trend": 995.5085432045155
+   "whole_trend": 995.5085432045156
   },
   {
    "date": "2026-08-03",
@@ -31,315 +31,315 @@
    "bpla_24h": 753,
    "rolling_level": NaN,
    "rolling_slope": NaN,
-   "whole_trend": 1000.7476236100357
+   "whole_trend": 1000.7476236100358
   },
   {
    "date": "2026-08-05",
    "bpla_24h": 1083,
    "rolling_level": NaN,
    "rolling_slope": NaN,
-   "whole_trend": 1002.5429567294075
+   "whole_trend": 1002.5429567294076
   },
   {
    "date": "2026-08-06",
    "bpla_24h": 1155,
    "rolling_level": NaN,
    "rolling_slope": NaN,
-   "whole_trend": 1003.7888184598536
+   "whole_trend": 1003.7888184598537
   },
   {
    "date": "2026-08-07",
    "bpla_24h": 1150,
    "rolling_level": NaN,
    "rolling_slope": NaN,
-   "whole_trend": 1004.485208801374
+   "whole_trend": 1004.4852088013743
   },
   {
    "date": "2026-08-08",
    "bpla_24h": 828,
    "rolling_level": NaN,
    "rolling_slope": NaN,
-   "whole_trend": 1004.6321277539689
+   "whole_trend": 1004.6321277539691
   },
   {
    "date": "2026-08-09",
    "bpla_24h": 970,
    "rolling_level": NaN,
    "rolling_slope": NaN,
-   "whole_trend": 1004.2295753176383
+   "whole_trend": 1004.2295753176385
   },
   {
    "date": "2026-08-10",
    "bpla_24h": 1134,
    "rolling_level": NaN,
    "rolling_slope": NaN,
-   "whole_trend": 1003.2775514923819
+   "whole_trend": 1003.2775514923823
   },
   {
    "date": "2026-08-11",
    "bpla_24h": 931,
    "rolling_level": NaN,
    "rolling_slope": NaN,
-   "whole_trend": 1001.7760562782001
+   "whole_trend": 1001.7760562782004
   },
   {
    "date": "2026-08-12",
    "bpla_24h": 1061,
    "rolling_level": NaN,
    "rolling_slope": NaN,
-   "whole_trend": 999.7250896750926
+   "whole_trend": 999.7250896750929
   },
   {
    "date": "2026-08-13",
    "bpla_24h": 1150,
    "rolling_level": NaN,
    "rolling_slope": NaN,
-   "whole_trend": 997.1246516830595
+   "whole_trend": 997.1246516830598
   },
   {
    "date": "2026-08-14",
    "bpla_24h": 774,
-   "rolling_level": 928.8607142857143,
-   "rolling_slope": -42.067445054945274,
-   "whole_trend": 993.9747423021008
+   "rolling_level": 928.8607142857134,
+   "rolling_slope": -42.06744505494541,
+   "whole_trend": 993.9747423021012
   },
   {
    "date": "2026-08-15",
    "bpla_24h": 1328,
-   "rolling_level": 1112.1035714285713,
-   "rolling_slope": 22.099038461538314,
-   "whole_trend": 990.2753615322166
+   "rolling_level": 1112.103571428571,
+   "rolling_slope": 22.099038461538257,
+   "whole_trend": 990.275361532217
   },
   {
    "date": "2026-08-16",
    "bpla_24h": 1478,
-   "rolling_level": 1256.471428571428,
-   "rolling_slope": 41.65219780219772,
-   "whole_trend": 986.0265093734067
+   "rolling_level": 1256.4714285714272,
+   "rolling_slope": 41.65219780219755,
+   "whole_trend": 986.0265093734071
   },
   {
    "date": "2026-08-17",
    "bpla_24h": 797,
-   "rolling_level": 1095.6,
-   "rolling_slope": -0.6494505494507763,
-   "whole_trend": 981.2281858256713
+   "rolling_level": 1095.5999999999995,
+   "rolling_slope": -0.6494505494508047,
+   "whole_trend": 981.2281858256716
   },
   {
    "date": "2026-08-18",
    "bpla_24h": 1671,
-   "rolling_level": 1415.9071428571424,
-   "rolling_slope": 107.75906593406556,
-   "whole_trend": 975.8803908890102
+   "rolling_level": 1415.907142857142,
+   "rolling_slope": 107.75906593406552,
+   "whole_trend": 975.8803908890105
   },
   {
    "date": "2026-08-19",
    "bpla_24h": 965,
-   "rolling_level": 1267.8000000000002,
+   "rolling_level": 1267.8,
    "rolling_slope": 48.94725274725273,
-   "whole_trend": 969.9831245634235
+   "whole_trend": 969.9831245634239
   },
   {
    "date": "2026-08-20",
    "bpla_24h": 1504,
-   "rolling_level": 1390.2178571428572,
-   "rolling_slope": 67.56167582417567,
-   "whole_trend": 963.5363868489113
+   "rolling_level": 1390.2178571428567,
+   "rolling_slope": 67.56167582417558,
+   "whole_trend": 963.5363868489117
   },
   {
    "date": "2026-08-21",
    "bpla_24h": 536,
-   "rolling_level": 978.8214285714271,
-   "rolling_slope": -80.28708791208831,
-   "whole_trend": 956.5401777454734
+   "rolling_level": 978.8214285714265,
+   "rolling_slope": -80.28708791208842,
+   "whole_trend": 956.5401777454738
   },
   {
    "date": "2026-08-22",
    "bpla_24h": 1053,
-   "rolling_level": 966.303571428571,
-   "rolling_slope": -74.08447802197821,
-   "whole_trend": 948.99449725311
+   "rolling_level": 966.3035714285703,
+   "rolling_slope": -74.08447802197824,
+   "whole_trend": 948.9944972531104
   },
   {
    "date": "2026-08-23",
    "bpla_24h": 1120,
-   "rolling_level": 988.728571428571,
-   "rolling_slope": -60.34670329670343,
-   "whole_trend": 940.8993453718209
+   "rolling_level": 988.7285714285705,
+   "rolling_slope": -60.34670329670354,
+   "whole_trend": 940.8993453718213
   },
   {
    "date": "2026-08-24",
    "bpla_24h": 988,
-   "rolling_level": 922.7107142857132,
-   "rolling_slope": -82.45453296703342,
-   "whole_trend": 932.2547221016064
+   "rolling_level": 922.7107142857122,
+   "rolling_slope": -82.45453296703346,
+   "whole_trend": 932.2547221016066
   },
   {
    "date": "2026-08-25",
    "bpla_24h": 460,
-   "rolling_level": 654.9857142857135,
-   "rolling_slope": -146.25219780219797,
-   "whole_trend": 923.0606274424661
+   "rolling_level": 654.9857142857128,
+   "rolling_slope": -146.25219780219808,
+   "whole_trend": 923.0606274424664
   },
   {
    "date": "2026-08-26",
    "bpla_24h": 798,
-   "rolling_level": 630.167857142857,
+   "rolling_level": 630.1678571428565,
    "rolling_slope": -132.05453296703308,
-   "whole_trend": 913.3170613944003
+   "whole_trend": 913.3170613944005
   },
   {
    "date": "2026-08-27",
    "bpla_24h": 591,
-   "rolling_level": 521.242857142857,
-   "rolling_slope": -145.23461538461555,
-   "whole_trend": 903.0240239574089
+   "rolling_level": 521.2428571428562,
+   "rolling_slope": -145.2346153846157,
+   "whole_trend": 903.0240239574091
   },
   {
    "date": "2026-08-28",
    "bpla_24h": 624,
-   "rolling_level": 558.507142857142,
-   "rolling_slope": -79.68708791208817,
-   "whole_trend": 892.1815151314918
+   "rolling_level": 558.5071428571409,
+   "rolling_slope": -79.68708791208851,
+   "whole_trend": 892.1815151314921
   },
   {
    "date": "2026-08-29",
    "bpla_24h": 715,
-   "rolling_level": 599.564285714285,
-   "rolling_slope": -44.13434065934104,
-   "whole_trend": 880.7895349166491
+   "rolling_level": 599.5642857142846,
+   "rolling_slope": -44.13434065934106,
+   "whole_trend": 880.7895349166495
   },
   {
    "date": "2026-08-30",
    "bpla_24h": 804,
-   "rolling_level": 651.6642857142848,
-   "rolling_slope": -23.792032967033293,
-   "whole_trend": 868.8480833128809
+   "rolling_level": 651.6642857142842,
+   "rolling_slope": -23.79203296703342,
+   "whole_trend": 868.8480833128813
   },
   {
    "date": "2026-08-31",
    "bpla_24h": 766,
-   "rolling_level": 790.5714285714284,
-   "rolling_slope": 63.280219780219596,
-   "whole_trend": 856.3571603201872
+   "rolling_level": 790.5714285714278,
+   "rolling_slope": 63.28021978021957,
+   "whole_trend": 856.3571603201874
   },
   {
    "date": "2026-09-01",
    "bpla_24h": 1050,
    "rolling_level": 911.5714285714282,
-   "rolling_slope": 79.07692307692291,
-   "whole_trend": 843.3167659385678
+   "rolling_slope": 79.0769230769228,
+   "whole_trend": 843.316765938568
   },
   {
    "date": "2026-09-02",
    "bpla_24h": 464,
-   "rolling_level": 788.5749999999994,
-   "rolling_slope": 52.487499999999784,
-   "whole_trend": 829.7269001680227
+   "rolling_level": 788.5749999999991,
+   "rolling_slope": 52.48749999999981,
+   "whole_trend": 829.7269001680229
   },
   {
    "date": "2026-09-03",
    "bpla_24h": 998,
-   "rolling_level": 851.9214285714288,
-   "rolling_slope": 39.98379120879104,
-   "whole_trend": 815.5875630085521
+   "rolling_level": 851.921428571428,
+   "rolling_slope": 39.98379120879093,
+   "whole_trend": 815.5875630085523
   },
   {
    "date": "2026-09-04",
    "bpla_24h": 916,
-   "rolling_level": 980.1214285714289,
-   "rolling_slope": 100.33324175824168,
-   "whole_trend": 800.8987544601559
+   "rolling_level": 980.1214285714282,
+   "rolling_slope": 100.3332417582416,
+   "whole_trend": 800.8987544601562
   },
   {
    "date": "2026-09-05",
    "bpla_24h": 763,
-   "rolling_level": 932.9428571428576,
-   "rolling_slope": 72.16703296703297,
-   "whole_trend": 785.6604745228342
+   "rolling_level": 932.9428571428568,
+   "rolling_slope": 72.16703296703285,
+   "whole_trend": 785.6604745228343
   },
   {
    "date": "2026-09-06",
    "bpla_24h": 400,
-   "rolling_level": 672.5285714285708,
-   "rolling_slope": -31.76208791208799,
-   "whole_trend": 769.8727231965867
+   "rolling_level": 672.5285714285706,
+   "rolling_slope": -31.762087912088056,
+   "whole_trend": 769.8727231965869
   },
   {
    "date": "2026-09-07",
    "bpla_24h": 287,
-   "rolling_level": 400.27142857142786,
-   "rolling_slope": -132.35659340659353,
-   "whole_trend": 753.5355004814137
+   "rolling_level": 400.27142857142746,
+   "rolling_slope": -132.3565934065937,
+   "whole_trend": 753.5355004814138
   },
   {
    "date": "2026-09-08",
    "bpla_24h": 713,
    "rolling_level": 482.3178571428567,
-   "rolling_slope": -85.02458791208801,
+   "rolling_slope": -85.02458791208802,
    "whole_trend": 736.6488063773152
   },
   {
    "date": "2026-09-09",
    "bpla_24h": 1185,
-   "rolling_level": 745.614285714285,
-   "rolling_slope": -4.765384615384994,
+   "rolling_level": 745.6142857142848,
+   "rolling_slope": -4.7653846153848605,
    "whole_trend": 719.212640884291
   },
   {
    "date": "2026-09-10",
    "bpla_24h": 556,
-   "rolling_level": 670.0750000000003,
-   "rolling_slope": -19.2350274725275,
+   "rolling_level": 670.0749999999997,
+   "rolling_slope": -19.235027472527484,
    "whole_trend": 701.2270040023411
   },
   {
    "date": "2026-09-11",
    "bpla_24h": 874,
-   "rolling_level": 783.5571428571423,
-   "rolling_slope": 27.390659340659035,
-   "whole_trend": 682.6918957314658
+   "rolling_level": 783.5571428571421,
+   "rolling_slope": 27.390659340659113,
+   "whole_trend": 682.6918957314657
   },
   {
    "date": "2026-09-12",
    "bpla_24h": 670,
-   "rolling_level": 770.6714285714286,
-   "rolling_slope": 30.204945054944936,
+   "rolling_level": 770.6714285714279,
+   "rolling_slope": 30.204945054944844,
    "whole_trend": 663.6073160716647
   },
   {
    "date": "2026-09-13",
    "bpla_24h": 902,
-   "rolling_level": 866.9249999999996,
-   "rolling_slope": 60.520741758241535,
-   "whole_trend": 643.9732650229382
+   "rolling_level": 866.9249999999993,
+   "rolling_slope": 60.52074175824139,
+   "whole_trend": 643.9732650229381
   },
   {
    "date": "2026-09-14",
    "bpla_24h": 1025,
-   "rolling_level": 1003.7392857142856,
-   "rolling_slope": 101.24766483516467,
-   "whole_trend": 623.789742585286
+   "rolling_level": 1003.7392857142853,
+   "rolling_slope": 101.24766483516464,
+   "whole_trend": 623.7897425852859
   },
   {
    "date": "2026-09-15",
    "bpla_24h": 244,
    "rolling_level": 659.1999999999996,
-   "rolling_slope": -28.963736263736322,
-   "whole_trend": 603.0567487587083
+   "rolling_slope": -28.963736263736415,
+   "whole_trend": 603.0567487587082
   },
   {
    "date": "2026-09-16",
    "bpla_24h": 258,
-   "rolling_level": 486.8785714285711,
-   "rolling_slope": -59.89917582417594,
-   "whole_trend": 581.774283543205
+   "rolling_level": 486.8785714285708,
+   "rolling_slope": -59.89917582417604,
+   "whole_trend": 581.7742835432047
   },
   {
    "date": "2026-09-17",
    "bpla_24h": 956,
-   "rolling_level": 632.125,
-   "rolling_slope": -24.42651098901105,
-   "whole_trend": 559.9423469387759
+   "rolling_level": 632.1249999999995,
+   "rolling_slope": -24.42651098901115,
+   "whole_trend": 559.9423469387757
   }
  ]
 }
