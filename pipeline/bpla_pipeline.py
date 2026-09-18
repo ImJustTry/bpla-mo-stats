@@ -9,6 +9,7 @@ bpla_pipeline.py — расчёт трендов по заявкам Миноб�
 
 import argparse
 import json
+import math
 import re
 from pathlib import Path
 
@@ -86,10 +87,17 @@ def compute(df: pd.DataFrame, window: int = 14) -> pd.DataFrame:
 # ----------------------------------------------------------------------
 
 def export_json(df: pd.DataFrame, path: Path):
-    """JSON, понятный JS без pandas-типов. NaN -> null."""
-    records = df.where(pd.notna(df), None).to_dict(orient="records")
-    for r in records:
-        r["date"] = pd.Timestamp(r["date"]).strftime("%Y-%m-%d")
+    """JSON, понятный JS без pandas-типов. NaN/inf -> null."""
+    records = []
+    for r in df.to_dict(orient="records"):
+        rec = {}
+        for k, v in r.items():
+            if isinstance(v, float) and not math.isfinite(v):
+                rec[k] = None          # None -> null в JSON
+            else:
+                rec[k] = v
+        rec["date"] = pd.Timestamp(rec["date"]).strftime("%Y-%m-%d")
+        records.append(rec)
     payload = {
         "meta": {
             "window": 14,
@@ -98,8 +106,9 @@ def export_json(df: pd.DataFrame, path: Path):
         },
         "data": records,
     }
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=1),
-                    encoding="utf-8")
+    # allow_nan=False: если где-то остался NaN — упадём с ошибкой, а не отдадим битый JSON
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=1,
+                               allow_nan=False), encoding="utf-8")
 
 
 # ----------------------------------------------------------------------
