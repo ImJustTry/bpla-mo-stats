@@ -1,0 +1,33 @@
+name: daily-update
+
+on:
+  push:
+    paths: ["data/raw/bpla_daily.csv"]   # сразу при ручном добавлении данных
+  schedule:
+    - cron: "25 5 * * *"                # 08:25 МСК (время в cron — UTC!)
+  workflow_dispatch:                    # кнопка "запустить вручную"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Установка библиотек
+        run: pip install pandas numpy matplotlib
+
+      - name: Пересчёт трендов
+        run: python pipeline/bpla_pipeline.py --input data/raw/bpla_daily.csv --outdir data --no-plot
+
+      - name: Сохранение результата
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: ежедневное обновление данных"
+          file_pattern: "data/*"
