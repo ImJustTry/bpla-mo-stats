@@ -112,13 +112,13 @@ async function main() {
 
     const xAll    = dates.slice(0, idx + 1);
     const traceRawFull = {
-      x: dates, y: values, mode: "lines+markers", name: "Суточная сводка (весь период)",
+      x: dates, y: values, mode: "markers", name: "Суточная сводка",
       line: { color: "#bbb", width: 1 }, marker: { size: 3 }, opacity: 0.6, hoverinfo: "skip"
     };
-    const traceRaw = {
-      x: xAll, y: sub, mode: "lines+markers", name: "Суточная сводка МО РФ",
-      line: { color: "#1f77b4", width: 1.2 }, marker: { size: 4 }
-    };
+    //const traceRaw = {
+    //  x: xAll, y: sub, mode: "lines+markers", name: "Суточная сводка МО РФ",
+    //  line: { color: "#1f77b4", width: 1.2 }, marker: { size: 4 }
+    //};
     const traceRoll = {
       x: xAll.slice(W - 1), y: level.slice(W - 1), mode: "lines",
       name: "Скользящая регрессия (14 дн.)", line: { color: "#d62728", width: 3 }
