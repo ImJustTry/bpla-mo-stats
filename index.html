@@ -135,7 +135,7 @@ async function main() {
                     y0: 0, y1: 1, yref: "paper", line: { dash: "dot", width: 2 } });
     }
 
-    Plotly.react("chart", [traceRawFull, traceRaw, traceRoll, traceTrend], {
+    Plotly.react("chart", [traceRawFull, traceRoll, traceTrend], { //[traceRawFull, traceRaw, traceRoll, traceTrend]
       title: { text: `Срез на ${dates[idx]}` },
       xaxis: { title: "Дата окончания оперативного окна", rangeslider: {} },
       yaxis: { title: "Птички за 24-часовое окно" },
