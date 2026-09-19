@@ -113,7 +113,7 @@ async function main() {
     const xAll    = dates.slice(0, idx + 1);
     const traceRawFull = {
       x: dates, y: values, mode: "markers", name: "Суточная сводка",
-      line: { color: "#bbb", width: 1 }, marker: { size: 3 }, opacity: 0.6, hoverinfo: "skip"
+      marker: { size: 3 }, opacity: 0.6, hoverinfo: "skip" //line: { color: "#bbb", width: 1 }
     };
     //const traceRaw = {
     //  x: xAll, y: sub, mode: "lines+markers", name: "Суточная сводка МО РФ",
