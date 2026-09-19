@@ -14,15 +14,14 @@
               background: #f5f5f5; border-radius: 8px; padding: 10px 14px; }
   select { font-size: 1rem; padding: 4px 8px; }
   #stats { font-size: .95rem; font-weight: 600; }
-  #chart, #chartVec { margin-top: 10px; }
+  #chart { margin-top: 10px; }
   .note { color: #888; font-size: .8rem; margin-top: 8px; }
 </style>
-<base target="_blank">
 </head>
 <body>
 
-<h1>Динамика сбитых птичек</h1>
-<div class="sub">Скользящее среднее 14 дн. · квадратичный тренд за весь период · вектор изменения</div>
+<h1>Сбитые птички</h1>
+<div class="sub">Динамика и оценочный «вектор» · 14-дневная квадратичная регрессия</div>
 
 <div class="controls">
   <label>Дата среза:
@@ -32,118 +31,68 @@
 </div>
 
 <div id="chart"></div>
-<div id="chartVec"></div>
-
-<p class="note">«Вектор» — изменение сглаженного уровня (MA14) за сутки.
-Пунктирная линия — квадратичный тренд по всему доступному периоду до выбранной даты.
-График перестраивается так, каким он был бы на выбранную дату (lookback).
-Ползунок под верхним графиком — масштаб оси X.</p>
+<p class="note">«Вектор» — производная сглаженной кривой в последней точке окна, Птички/сутки.
+График перестраивается так, каким он был бы на выбранную дату (lookback). Ползунок под графиком — масштаб оси X.</p>
 
 <script>
-// ================= Математика =================
+// ================= Математика (то же, что в Python-пайплайне) =================
 
-// Скользящее среднее
-function ma(arr, w) {
-  const out = new Array(arr.length).fill(null);
-  let s = 0;
-  for (let i = 0; i < arr.length; i++) {
-    s += arr[i];
-    if (i >= w) s -= arr[i - w];
-    if (i >= w - 1) out[i] = s / w;
+// Решение системы 3x3 методом Гаусса (A — матрица, b — столбец)
+function solve3(A, b) {
+  const M = A.map((row, i) => [...row, b[i]]);
+  for (let col = 0; col < 3; col++) {
+    let piv = col;
+    for (let r = col + 1; r < 3; r++)
+      if (Math.abs(M[r][col]) > Math.abs(M[piv][col])) piv = r;
+    [M[col], M[piv]] = [M[piv], M[col]];
+    for (let r = 0; r < 3; r++) {
+      if (r === col) continue;
+      const f = M[r][col] / M[col][col];
+      for (let c = col; c < 4; c++) M[r][c] -= f * M[col][c];
+    }
   }
-  return out;
+  return [M[0][3]/M[0][0], M[1][3]/M[1][1], M[2][3]/M[2][2]];
 }
 
-// Квадратичная регрессия y = a*x² + b*x + c
+// Квадратичная регрессия y = a*x^2 + b*x + c, x = 0..n-1 (нормальные уравнения)
 function quadFit(y) {
   const n = y.length;
-  if (n < 3) return null;
-
-  let sx = 0, sx2 = 0, sx3 = 0, sx4 = 0;
-  let sy = 0, sxy = 0, sx2y = 0;
-
+  let sx=0, sx2=0, sx3=0, sx4=0, sy=0, sxy=0, sx2y=0;
   for (let i = 0; i < n; i++) {
-    const x = i;
-    const yy = y[i];
-    const x2 = x * x;
-
-    sx += x;
-    sx2 += x2;
-    sx3 += x2 * x;
-    sx4 += x2 * x2;
-    sy += yy;
-    sxy += x * yy;
-    sx2y += x2 * yy;
+    const x = i, yy = y[i];
+    sx += x; sx2 += x*x; sx3 += x*x*x; sx4 += x*x*x*x;
+    sy += yy; sxy += x*yy; sx2y += x*x*yy;
   }
-
-  // Нормальные уравнения:
-  // Σx⁴·a + Σx³·b + Σx²·c = Σx²y
-  // Σx³·a + Σx²·b + Σx ·c = Σxy
-  // Σx²·a + Σx ·b + n  ·c = Σy
-
-  const A = [
-    [sx4, sx3, sx2, sx2y],
-    [sx3, sx2, sx, sxy],
-    [sx2, sx, n, sy]
-  ];
-
-  // Метод Гаусса
-  for (let col = 0; col < 3; col++) {
-    let pivot = col;
-
-    for (let row = col + 1; row < 3; row++) {
-      if (Math.abs(A[row][col]) > Math.abs(A[pivot][col])) {
-        pivot = row;
-      }
-    }
-
-    if (Math.abs(A[pivot][col]) < 1e-12) return null;
-
-    [A[col], A[pivot]] = [A[pivot], A[col]];
-
-    for (let row = col + 1; row < 3; row++) {
-      const factor = A[row][col] / A[col][col];
-      for (let k = col; k < 4; k++) {
-        A[row][k] -= factor * A[col][k];
-      }
-    }
-  }
-
-  const c = A[2][3] / A[2][2];
-  const b = (A[1][3] - A[1][2] * c) / A[1][1];
-  const a = (A[0][3] - A[0][2] * c - A[0][1] * b) / A[0][0];
-
-  return [a, b, c];
+  const A = [[sx4, sx3, sx2], [sx3, sx2, sx], [sx2, sx, n]];
+  return solve3(A, [sx2y, sxy, sy]); // [a, b, c]
 }
 
-// Значение квадратичной функции
-function quadValue(coeffs, x) {
-  const [a, b, c] = coeffs;
-  return a * x * x + b * x + c;
-}
-
-// Производная квадратичного тренда
-function quadDerivative(coeffs, x) {
-  const [a, b] = coeffs;
-  return 2 * a * x + b;
+// Скользящая регрессия окном W: level и slope в конце каждого окна
+function rollingQuad(values, W) {
+  const level = new Array(values.length).fill(null);
+  const slope = new Array(values.length).fill(null);
+  for (let j = W - 1; j < values.length; j++) {
+    const [a, b, c] = quadFit(values.slice(j - W + 1, j + 1));
+    level[j] = a*(W-1)**2 + b*(W-1) + c;       // значение кривой в x = W-1
+    slope[j] = 2*a*(W-1) + b;                  // производная в x = W-1
+  }
+  return { level, slope };
 }
 
 // ================= Загрузка и отрисовка =================
 
 const W = 14;
-const RUBICON = "2026-08-13";
 
 async function main() {
   const resp = await fetch("data/bpla_daily.json");
   const payload = await resp.json();
   const rows = payload.data;
 
-  const dates = rows.map(r => r.date);
+  const dates  = rows.map(r => r.date);
   const values = rows.map(r => r.bpla_24h);
   const N = dates.length;
 
   const sel = document.getElementById("dateSel");
-
   dates.forEach((d, i) => {
     const opt = document.createElement("option");
     opt.value = i;
@@ -153,142 +102,54 @@ async function main() {
   });
 
   function draw(idx) {
-    // Lookback: используются только данные до выбранной даты
+    // lookback: все расчёты — только по данным до даты среза включительно
     const sub = values.slice(0, idx + 1);
-    const subDates = dates.slice(0, idx + 1);
+    const { level, slope } = rollingQuad(sub, W);
 
-    // MA14
-    const ma14 = ma(sub, W);
+    const [a, b, c] = quadFit(sub);
+    const trend = sub.map((_, x) => a*x*x + b*x + c);
+    const wholeSlopeEnd = 2*a*(sub.length - 1) + b;
 
-    // Вектор MA14: изменение сглаженного уровня за сутки
-    const vec = ma14.map((v, i) =>
-      (v === null || i === 0 || ma14[i - 1] === null)
-        ? null
-        : v - ma14[i - 1]
-    );
+    const xAll    = dates.slice(0, idx + 1);
+    const traceRawFull = {
+      x: dates, y: values, mode: "lines+markers", name: "Суточная сводка (весь период)",
+      line: { color: "#bbb", width: 1 }, marker: { size: 3 }, opacity: 0.6, hoverinfo: "skip"
+    };
+    const traceRaw = {
+      x: xAll, y: sub, mode: "lines+markers", name: "Суточная сводка МО РФ",
+      line: { color: "#1f77b4", width: 1.2 }, marker: { size: 4 }
+    };
+    const traceRoll = {
+      x: xAll.slice(W - 1), y: level.slice(W - 1), mode: "lines",
+      name: "Скользящая регрессия (14 дн.)", line: { color: "#d62728", width: 3 }
+    };
+    const traceTrend = {
+      x: xAll, y: trend, mode: "lines", name: "Квадратичный тренд периода",
+      line: { color: "#2ca02c", width: 2, dash: "dash" }
+    };
 
-    // Квадратичный тренд за весь доступный период
-    const quad = quadFit(sub);
-
-    let quadX = [];
-    let quadY = [];
-    let longTermVector = null;
-
-    if (quad !== null) {
-      for (let i = 0; i < sub.length; i++) {
-        quadX.push(subDates[i]);
-        quadY.push(quadValue(quad, i));
-      }
-
-      // Производная в последней точке
-      longTermVector = quadDerivative(quad, sub.length - 1);
+    const shapes = [];
+    const rubIdx = dates.indexOf("2026-08-13");
+    if (rubIdx >= 0 && rubIdx <= idx) {
+      shapes.push({ type: "line", x0: "2026-08-13", x1: "2026-08-13",
+                    y0: 0, y1: 1, yref: "paper", line: { dash: "dot", width: 2 } });
     }
 
-    // Рубикон
-    const rubIdx = dates.indexOf(RUBICON);
-    const shapes = (rubIdx >= 0 && rubIdx <= idx)
-      ? [{
-          type: "line",
-          x0: RUBICON,
-          x1: RUBICON,
-          y0: 0,
-          y1: 1,
-          yref: "paper",
-          line: { dash: "dot", width: 2 }
-        }]
-      : [];
-
-    // --- Верхняя панель ---
-    Plotly.react("chart", [
-      {
-        x: dates,
-        y: values,
-        mode: "lines+markers",
-        name: "Сводка (весь период)",
-        line: { color: "#ccc", width: 1 },
-        marker: { size: 3 },
-        hoverinfo: "skip",
-        showlegend: true
-      },
-      {
-        x: subDates,
-        y: sub,
-        mode: "lines+markers",
-        name: "Суточная сводка",
-        line: { color: "#1f77b4", width: 1.2 },
-        marker: { size: 4 }
-      },
-      {
-        x: subDates,
-        y: ma14,
-        mode: "lines",
-        name: "Скользящее среднее 14 дн.",
-        line: { color: "#d62728", width: 3 },
-        connectgaps: false
-      },
-      {
-        x: quadX,
-        y: quadY,
-        mode: "lines",
-        name: "Квадратичный тренд за весь период",
-        line: { color: "#444", width: 2, dash: "dash" }
-      }
-    ], {
+    Plotly.react("chart", [traceRawFull, traceRaw, traceRoll, traceTrend], {
       title: { text: `Срез на ${dates[idx]}` },
-      xaxis: { rangeslider: {} },
-      yaxis: { title: "Птички за 24 часа" },
+      xaxis: { title: "Дата окончания оперативного окна", rangeslider: {} },
+      yaxis: { title: "Птички за 24-часовое окно" },
       hovermode: "x unified",
-      legend: { orientation: "h", y: 1.14 },
+      legend: { orientation: "h", y: 1.12 },
       shapes,
-      margin: { t: 60 },
-      height: 500
-    }, {
-      responsive: true,
-      displaylogo: false
-    });
+      margin: { t: 60 }
+    }, { responsive: true, displaylogo: false });
 
-    // --- Нижняя панель: вектор ---
-    Plotly.react("chartVec", [{
-      x: subDates,
-      y: vec,
-      type: "bar",
-      marker: {
-        color: vec.map(v =>
-          v === null ? "#999" : (v >= 0 ? "#2ca02c" : "#d62728")
-        )
-      },
-      name: "Вектор"
-    }], {
-      xaxis: { matches: "x" },
-      yaxis: { title: "Вектор, Птички/сутки" },
-      showlegend: false,
-      margin: { t: 10 },
-      height: 220
-    }, {
-      responsive: true,
-      displaylogo: false
-    });
-
-    // --- Статистика ---
-    const lvl = ma14[idx];
-    const v = vec[idx];
-
-    if (lvl === null) {
-      document.getElementById("stats").textContent =
-        "Недостаточно данных для сглаживания";
-    } else {
-      let text = `Уровень (MA14): ${lvl.toFixed(0)}`;
-
-      if (v !== null) {
-        text += ` · Вектор: ${v >= 0 ? "+" : ""}${v.toFixed(1)} Птички/сутки`;
-      }
-
-      if (longTermVector !== null) {
-        text += ` · Квадр. тренд: ${longTermVector >= 0 ? "+" : ""}${longTermVector.toFixed(1)} Птички/сутки`;
-      }
-
-      document.getElementById("stats").textContent = text;
-    }
+    const lvl = level[idx], sl = slope[idx];
+    document.getElementById("stats").textContent =
+      (lvl === null ? "" :
+        `14-дн. уровень: ${lvl.toFixed(1)} · 14-дн. вектор: ${sl >= 0 ? "+" : ""}${sl.toFixed(1)} Птички/сутки · `) +
+      `наклон тренда: ${wholeSlopeEnd >= 0 ? "+" : ""}${wholeSlopeEnd.toFixed(1)} Птички/сутки`;
   }
 
   sel.addEventListener("change", () => draw(+sel.value));
@@ -296,7 +157,8 @@ async function main() {
 }
 
 main().catch(e => {
-  document.getElementById("stats").textContent =
-    "Ошибка загрузки данных: " + e.message;
+  document.getElementById("stats").textContent = "Ошибка загрузки данных: " + e.message;
 });
-
+</script>
+</body>
+</html>
