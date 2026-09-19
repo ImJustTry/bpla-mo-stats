@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -22,7 +23,7 @@
 <body>
 
 <h1>Динамика сбитых птичек</h1>
-<div class="sub">Скользящее среднее 14 дн. · недельные линейные тренды · вектор изменения</div>
+<div class="sub">Скользящее среднее 14 дн. · квадратичный тренд за весь период · вектор изменения</div>
 
 <div class="controls">
   <label>Дата среза:
@@ -33,14 +34,16 @@
 
 <div id="chart"></div>
 <div id="chartVec"></div>
+
 <p class="note">«Вектор» — изменение сглаженного уровня (MA14) за сутки.
-Зелёные пунктирные сегменты — линейный тренд за каждую неделю (разрывы между ними — смена режима).
-График перестраивается так, каким он был бы на выбранную дату (lookback). Ползунок под верхним графиком — масштаб оси X.</p>
+Пунктирная линия — квадратичный тренд по всему доступному периоду до выбранной даты.
+График перестраивается так, каким он был бы на выбранную дату (lookback).
+Ползунок под верхним графиком — масштаб оси X.</p>
 
 <script>
 // ================= Математика =================
 
-// Скользящее среднее (первые w-1 значений — null)
+// Скользящее среднее
 function ma(arr, w) {
   const out = new Array(arr.length).fill(null);
   let s = 0;
@@ -52,34 +55,83 @@ function ma(arr, w) {
   return out;
 }
 
-// Линейная регрессия y = a*x + b (метод наименьших квадратов)
-function linFit(y) {
+// Квадратичная регрессия y = a*x² + b*x + c
+function quadFit(y) {
   const n = y.length;
-  let sx = 0, sy = 0, sxy = 0, sx2 = 0;
-  for (let i = 0; i < n; i++) { sx += i; sy += y[i]; sxy += i * y[i]; sx2 += i * i; }
-  const a = (n * sxy - sx * sy) / (n * sx2 - sx * sx);
-  return [a, sy / n - a * sx / n]; // [a, b]
+  if (n < 3) return null;
+
+  let sx = 0, sx2 = 0, sx3 = 0, sx4 = 0;
+  let sy = 0, sxy = 0, sx2y = 0;
+
+  for (let i = 0; i < n; i++) {
+    const x = i;
+    const yy = y[i];
+    const x2 = x * x;
+
+    sx += x;
+    sx2 += x2;
+    sx3 += x2 * x;
+    sx4 += x2 * x2;
+    sy += yy;
+    sxy += x * yy;
+    sx2y += x2 * yy;
+  }
+
+  // Нормальные уравнения:
+  // Σx⁴·a + Σx³·b + Σx²·c = Σx²y
+  // Σx³·a + Σx²·b + Σx ·c = Σxy
+  // Σx²·a + Σx ·b + n  ·c = Σy
+
+  const A = [
+    [sx4, sx3, sx2, sx2y],
+    [sx3, sx2, sx, sxy],
+    [sx2, sx, n, sy]
+  ];
+
+  // Метод Гаусса
+  for (let col = 0; col < 3; col++) {
+    let pivot = col;
+
+    for (let row = col + 1; row < 3; row++) {
+      if (Math.abs(A[row][col]) > Math.abs(A[pivot][col])) {
+        pivot = row;
+      }
+    }
+
+    if (Math.abs(A[pivot][col]) < 1e-12) return null;
+
+    [A[col], A[pivot]] = [A[pivot], A[col]];
+
+    for (let row = col + 1; row < 3; row++) {
+      const factor = A[row][col] / A[col][col];
+      for (let k = col; k < 4; k++) {
+        A[row][k] -= factor * A[col][k];
+      }
+    }
+  }
+
+  const c = A[2][3] / A[2][2];
+  const b = (A[1][3] - A[1][2] * c) / A[1][1];
+  const a = (A[0][3] - A[0][2] * c - A[0][1] * b) / A[0][0];
+
+  return [a, b, c];
 }
 
-// Недельные линейные сегменты: разбиваем ряд на блоки по 7 дней,
-// для каждого блока (>= 5 точек) строим линию. Между блоками — null (разрыв).
-function weeklySegments(values) {
-  const xs = [], ys = [], slopes = [];
-  for (let start = 0; start < values.length; start += 7) {
-    const block = values.slice(start, start + 7);
-    if (block.length < 5) break;
-    const [a, b] = linFit(block);
-    for (let t = 0; t < block.length; t++) { xs.push(start + t); ys.push(a * t + b); }
-    xs.push(null); ys.push(null);
-    slopes.push({ start, end: start + block.length - 1, a });
-  }
-  return { xs, ys, slopes };
+// Значение квадратичной функции
+function quadValue(coeffs, x) {
+  const [a, b, c] = coeffs;
+  return a * x * x + b * x + c;
+}
+
+// Производная квадратичного тренда
+function quadDerivative(coeffs, x) {
+  const [a, b] = coeffs;
+  return 2 * a * x + b;
 }
 
 // ================= Загрузка и отрисовка =================
 
 const W = 14;
-const WEEK = 7;
 const RUBICON = "2026-08-13";
 
 async function main() {
@@ -87,11 +139,12 @@ async function main() {
   const payload = await resp.json();
   const rows = payload.data;
 
-  const dates  = rows.map(r => r.date);
+  const dates = rows.map(r => r.date);
   const values = rows.map(r => r.bpla_24h);
   const N = dates.length;
 
   const sel = document.getElementById("dateSel");
+
   dates.forEach((d, i) => {
     const opt = document.createElement("option");
     opt.value = i;
@@ -101,31 +154,86 @@ async function main() {
   });
 
   function draw(idx) {
-    // lookback: всё считается только по данным до даты среза включительно
+    // Lookback: используются только данные до выбранной даты
     const sub = values.slice(0, idx + 1);
     const subDates = dates.slice(0, idx + 1);
+
+    // MA14
     const ma14 = ma(sub, W);
-    const vec = ma14.map((v, i) => (v === null || ma14[i-1] === null) ? null : v - ma14[i-1]);
 
-    const seg = weeklySegments(sub);
+    // Вектор MA14: изменение сглаженного уровня за сутки
+    const vec = ma14.map((v, i) =>
+      (v === null || i === 0 || ma14[i - 1] === null)
+        ? null
+        : v - ma14[i - 1]
+    );
 
+    // Квадратичный тренд за весь доступный период
+    const quad = quadFit(sub);
+
+    let quadX = [];
+    let quadY = [];
+    let longTermVector = null;
+
+    if (quad !== null) {
+      for (let i = 0; i < sub.length; i++) {
+        quadX.push(subDates[i]);
+        quadY.push(quadValue(quad, i));
+      }
+
+      // Производная в последней точке
+      longTermVector = quadDerivative(quad, sub.length - 1);
+    }
+
+    // Рубикон
     const rubIdx = dates.indexOf(RUBICON);
     const shapes = (rubIdx >= 0 && rubIdx <= idx)
-      ? [{ type: "line", x0: RUBICON, x1: RUBICON, y0: 0, y1: 1, yref: "paper",
-           line: { dash: "dot", width: 2 } }] : [];
+      ? [{
+          type: "line",
+          x0: RUBICON,
+          x1: RUBICON,
+          y0: 0,
+          y1: 1,
+          yref: "paper",
+          line: { dash: "dot", width: 2 }
+        }]
+      : [];
 
-    // --- верхняя панель ---
+    // --- Верхняя панель ---
     Plotly.react("chart", [
-      { x: dates, y: values, mode: "lines+markers", name: "Сводка (весь период)",
-        line: { color: "#ccc", width: 1 }, marker: { size: 3 }, hoverinfo: "skip",
-        showlegend: true },
-      { x: subDates, y: sub, mode: "lines+markers", name: "Суточная сводка МО РФ",
-        line: { color: "#1f77b4", width: 1.2 }, marker: { size: 4 } },
-      { x: subDates, y: ma14, mode: "lines", name: "Скользящее среднее 14 дн.",
-        line: { color: "#d62728", width: 3 }, connectgaps: false },
-      { x: seg.xs.map(i => i === null ? null : subDates[i]), y: seg.ys,
-        mode: "lines", name: "Недельный линейный тренд",
-        line: { color: "#2ca02c", width: 2, dash: "dash" }, connectgaps: false }
+      {
+        x: dates,
+        y: values,
+        mode: "lines+markers",
+        name: "Сводка (весь период)",
+        line: { color: "#ccc", width: 1 },
+        marker: { size: 3 },
+        hoverinfo: "skip",
+        showlegend: true
+      },
+      {
+        x: subDates,
+        y: sub,
+        mode: "lines+markers",
+        name: "Суточная сводка",
+        line: { color: "#1f77b4", width: 1.2 },
+        marker: { size: 4 }
+      },
+      {
+        x: subDates,
+        y: ma14,
+        mode: "lines",
+        name: "Скользящее среднее 14 дн.",
+        line: { color: "#d62728", width: 3 },
+        connectgaps: false
+      },
+      {
+        x: quadX,
+        y: quadY,
+        mode: "lines",
+        name: "Квадратичный тренд за весь период",
+        line: { color: "#444", width: 2, dash: "dash" }
+      }
     ], {
       title: { text: `Срез на ${dates[idx]}` },
       xaxis: { rangeslider: {} },
@@ -135,25 +243,53 @@ async function main() {
       shapes,
       margin: { t: 60 },
       height: 500
-    }, { responsive: true, displaylogo: false });
+    }, {
+      responsive: true,
+      displaylogo: false
+    });
 
-    // --- нижняя панель: вектор ---
+    // --- Нижняя панель: вектор ---
     Plotly.react("chartVec", [{
-      x: subDates, y: vec, type: "bar",
-      marker: { color: vec.map(v => v === null ? "#999" : (v >= 0 ? "#2ca02c" : "#d62728")) },
+      x: subDates,
+      y: vec,
+      type: "bar",
+      marker: {
+        color: vec.map(v =>
+          v === null ? "#999" : (v >= 0 ? "#2ca02c" : "#d62728")
+        )
+      },
       name: "Вектор"
     }], {
       xaxis: { matches: "x" },
-      yaxis: { title: "Вектор, БПЛА/сутки" },
+      yaxis: { title: "Вектор, Птички/сутки" },
       showlegend: false,
       margin: { t: 10 },
       height: 220
-    }, { responsive: true, displaylogo: false });
+    }, {
+      responsive: true,
+      displaylogo: false
+    });
 
-    const lvl = ma14[idx], v = vec[idx];
-    document.getElementById("stats").textContent =
-      lvl === null ? "Недостаточно данных для сглаживания"
-        : `Уровень (MA14): ${lvl.toFixed(0)} · Вектор: ${v >= 0 ? "+" : ""}${v.toFixed(1)} Птички/сутки`;
+    // --- Статистика ---
+    const lvl = ma14[idx];
+    const v = vec[idx];
+
+    if (lvl === null) {
+      document.getElementById("stats").textContent =
+        "Недостаточно данных для сглаживания";
+    } else {
+      let text = `Уровень (MA14): ${lvl.toFixed(0)}`;
+
+      if (v !== null) {
+        text += ` · Вектор: ${v >= 0 ? "+" : ""}${v.toFixed(1)} Птички/сутки`;
+      }
+
+      if (longTermVector !== null) {
+        text += ` · Квадр. тренд: ${longTermVector >= 0 ? "+" : ""}${longTermVector.toFixed(1)} Птички/сутки`;
+      }
+
+      document.getElementById("stats").textContent = text;
+    }
   }
 
   sel.addEventListener("change", () => draw(+sel.value));
@@ -161,8 +297,7 @@ async function main() {
 }
 
 main().catch(e => {
-  document.getElementById("stats").textContent = "Ошибка загрузки данных: " + e.message;
+  document.getElementById("stats").textContent =
+    "Ошибка загрузки данных: " + e.message;
 });
-</script>
-</body>
-</html>
+```
