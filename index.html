@@ -13,7 +13,7 @@
   .controls { display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
               background: #f5f5f5; border-radius: 8px; padding: 10px 14px; }
   select { font-size: 1rem; padding: 4px 8px; }
-  #stats { font-size: .95rem; font-weight: 600; }
+  #stats { font-size: .95rem; font-weight: 600; flex-basis: 100%; }
   #chart, #chartVec { margin-top: 10px; }
   .note { color: #888; font-size: .8rem; margin-top: 8px; }
 </style>
@@ -22,7 +22,7 @@
 <body>
 
 <h1>Сбитые птички</h1>
-<div class="sub">Скользящее среднее 14 дн. · квадратичные тренды выбранного масштаба · вектор изменения · данные: <a href="https://docs.google.com/spreadsheets/d/1K1aSN9d0JA44ruQOIPh9fwgZlKsRBhSMqaK0KDzOtsw/edit?usp=sharing">Google-таблица</a></div>
+<div class="sub">Настраиваемые сглаживание и тренды · вектор изменения · данные: <a href="https://docs.google.com/spreadsheets/d/1K1aSN9d0JA44ruQOIPh9fwgZlKsRBhSMqaK0KDzOtsw/edit?usp=sharing">Google-таблица</a></div>
 
 <div class="controls">
   <label>Дата среза:
@@ -36,13 +36,33 @@
       <option value="0" selected>Весь период</option>
     </select>
   </label>
+  <label>Вид тренда:
+    <select id="trendTypeSel">
+      <option value="lin">Линейный</option>
+      <option value="quad" selected>Квадратичный</option>
+    </select>
+  </label>
+  <label>Сглаживание:
+    <select id="smoothTypeSel">
+      <option value="sma">Скользящее среднее</option>
+      <option value="quad" selected>Квадратичная регрессия</option>
+    </select>
+  </label>
+  <label>Окно сглаживания:
+    <select id="winSel">
+      <option value="7">7 дн.</option>
+      <option value="14" selected>14 дн.</option>
+      <option value="30">30 дн.</option>
+    </select>
+  </label>
   <span id="stats">Загружаю данные из Google Sheets…</span>
 </div>
 
 <div id="chart"></div>
 <div id="chartVec"></div>
-<p class="note">«Вектор» — изменение сглаженного уровня (MA14) за сутки, Птички/сутки.
-Зелёные пунктирные дуги — квадратичный тренд каждого блока выбранного масштаба (разрывы между ними — смена режима).
+<p class="note">«Вектор» — изменение сглаженной линии за сутки, Птички/сутки.
+Красная линия — сглаживание (среднее или скользящая регрессия по выбранному окну).
+Зелёные пунктирные сегменты — тренд выбранного масштаба и вида (разрывы между блоками — смена режима).
 График перестраивается так, каким он был бы на выбранную дату (lookback). Ползунок под верхним графиком — масштаб оси X.
 Обновления в таблице появляются на графике с задержкой 1–5 минут (кэш Google).</p>
 
@@ -50,7 +70,6 @@
 // ================= Настройки =================
 const SHEET_ID = "1K1aSN9d0JA44ruQOIPh9fwgZlKsRBhSMqaK0KDzOtsw";
 const SHEET_CSV = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
-const W = 14;          // окно скользящего среднего
 const RUBICON = "2026-08-13";
 const SCALE_NAMES = { 7: "неделя", 14: "2 недели", 30: "месяц", 0: "весь период" };
 
@@ -98,13 +117,14 @@ async function loadData() {
     const v = parseFloat(String(rows[i][1]).replace(/\s/g, "").replace(",", "."));
     if (/^\d{4}-\d{2}-\d{2}$/.test(d) && Number.isFinite(v)) out.push({ date: d, v });
   }
-  if (out.length < 15) throw new Error("в таблице слишком мало данных (" + out.length + " строк)");
+  if (out.length < 8) throw new Error("в таблице слишком мало данных (" + out.length + " строк)");
   out.sort((a, b) => a.date < b.date ? -1 : 1);
   return out;
 }
 
 // ================= Математика =================
 
+// Скользящее среднее (первые w-1 значений — null)
 function ma(arr, w) {
   const out = new Array(arr.length).fill(null);
   let s = 0;
@@ -133,9 +153,8 @@ function solve3(A, b) {
   return [M[0][3]/M[0][0], M[1][3]/M[1][1], M[2][3]/M[2][2]];
 }
 
-// Квадратичная регрессия y = A*t^2 + B*t + C, t = x - центр блока.
-// Центрирование (t вместо x) — чтобы большие блоки не портили точность.
-// Возвращает [A, B, C, t0], где t = x - t0.
+// Квадратичная регрессия y = A*t^2 + B*t + C с центрированием t = x - t0.
+// Возвращает [A, B, C, t0].
 function quadFit(y) {
   const n = y.length, t0 = (n - 1) / 2;
   let st=0, st2=0, st3=0, st4=0, sy=0, sty=0, st2y=0;
@@ -149,25 +168,52 @@ function quadFit(y) {
   return [Aq, Bq, Cq, t0];
 }
 
-// Квадратичные тренды блоками по `block` дней (block = 0 — один блок на весь ряд).
-// Возвращает дуги для графика и наклон (производную) в конце последнего блока.
-function blockTrends(values, block) {
+// Линейная регрессия y = a*x + b; возвращает [a, b]
+function linFit(y) {
+  const n = y.length;
+  let sx = 0, sy = 0, sxy = 0, sx2 = 0;
+  for (let i = 0; i < n; i++) { sx += i; sy += y[i]; sxy += i * y[i]; sx2 += i * i; }
+  const a = (n * sxy - sx * sy) / (n * sx2 - sx * sx);
+  return [a, sy / n - a * sx / n];
+}
+
+// Сглаживание: "sma" — скользящее среднее, "quad" — скользящая квадратичная регрессия
+// (значение дуги в правом крае окна). Первые w-1 значений — null.
+function smooth(values, w, mode) {
+  if (mode === "sma") return ma(values, w);
+  const out = new Array(values.length).fill(null);
+  for (let j = w - 1; j < values.length; j++) {
+    const [Aq, Bq, Cq, t0] = quadFit(values.slice(j - w + 1, j + 1));
+    const t = (w - 1) - t0;
+    out[j] = Aq*t*t + Bq*t + Cq;
+  }
+  return out;
+}
+
+// Тренды блоками по `block` дней (block = 0 — один блок на весь ряд).
+// mode: "lin" | "quad". Возвращает линии и наклон в конце последнего блока.
+function blockTrends(values, block, mode) {
   const size = block === 0 ? values.length : block;
   const xs = [], ys = [];
   let endSlope = null;
   for (let start = 0; start < values.length; start += size) {
     const b = values.slice(start, start + size);
     if (b.length < 5) break;
-    const [Aq, Bq, Cq, t0] = quadFit(b);
     const n = b.length;
-    for (let t = 0; t < n; t++) {
-      const tc = t - t0;
-      xs.push(start + t);
-      ys.push(Aq*tc*tc + Bq*tc + Cq);
+    if (mode === "quad") {
+      const [Aq, Bq, Cq, t0] = quadFit(b);
+      for (let t = 0; t < n; t++) {
+        const tc = t - t0;
+        xs.push(start + t);
+        ys.push(Aq*tc*tc + Bq*tc + Cq);
+      }
+      endSlope = 2 * Aq * (n - 1 - t0) + Bq;
+    } else {
+      const [a, c] = linFit(b);
+      for (let t = 0; t < n; t++) { xs.push(start + t); ys.push(a * t + c); }
+      endSlope = a;
     }
     xs.push(null); ys.push(null);
-    // производная в последней точке блока: dy/dx = 2*A*t + B при t = n-1-t0
-    endSlope = 2 * Aq * (n - 1 - t0) + Bq;
   }
   return { xs, ys, endSlope };
 }
@@ -189,14 +235,25 @@ async function main() {
     sel.appendChild(opt);
   });
   const scaleSel = document.getElementById("scaleSel");
+  const trendTypeSel = document.getElementById("trendTypeSel");
+  const smoothTypeSel = document.getElementById("smoothTypeSel");
+  const winSel = document.getElementById("winSel");
 
   function draw(idx) {
     const scale = +scaleSel.value;
+    const trendMode = trendTypeSel.value;
+    const smMode = smoothTypeSel.value;
+    const w = +winSel.value;
+
     const sub = values.slice(0, idx + 1);
     const subDates = dates.slice(0, idx + 1);
-    const ma14 = ma(sub, W);
-    const vec = ma14.map((v, i) => (v === null || ma14[i-1] === null) ? null : v - ma14[i-1]);
-    const tr = blockTrends(sub, scale);
+    const sm = smooth(sub, w, smMode);
+    const vec = sm.map((v, i) => (v === null || sm[i-1] === null) ? null : v - sm[i-1]);
+    const tr = blockTrends(sub, scale, trendMode);
+
+    const trendName = (trendMode === "quad" ? "Квадратичный тренд" : "Линейный тренд")
+      + ` (${SCALE_NAMES[scale]})`;
+    const smName = (smMode === "quad" ? `Скользящая регрессия ${w} дн.` : `Скользящее среднее ${w} дн.`);
 
     const rubIdx = dates.indexOf(RUBICON);
     const shapes = (rubIdx >= 0 && rubIdx <= idx)
@@ -206,10 +263,10 @@ async function main() {
     Plotly.react("chart", [
       { x: dates, y: values, mode: "markers", name: "Суточная сводка",
         marker: { size: 4, color: "#1f77b4" }, opacity: 0.55 },
-      { x: subDates, y: ma14, mode: "lines", name: "Скользящее среднее 14 дн.",
+      { x: subDates, y: sm, mode: "lines", name: smName,
         line: { color: "#d62728", width: 3 }, connectgaps: false },
       { x: tr.xs.map(i => i === null ? null : subDates[i]), y: tr.ys,
-        mode: "lines", name: `Квадратичный тренд (${SCALE_NAMES[scale]})`,
+        mode: "lines", name: trendName,
         line: { color: "#2ca02c", width: 2, dash: "dash" }, connectgaps: false }
     ], {
       title: { text: `Срез на ${dates[idx]}` },
@@ -233,16 +290,16 @@ async function main() {
       height: 220
     }, { responsive: true, displaylogo: false });
 
-    const lvl = ma14[idx], v = vec[idx];
+    const lvl = sm[idx], v = vec[idx];
     let text = lvl === null ? "Недостаточно данных для сглаживания"
-      : `Уровень (MA14): ${lvl.toFixed(0)} · Вектор: ${v >= 0 ? "+" : ""}${v.toFixed(1)}`;
+      : `Уровень: ${lvl.toFixed(0)} · Вектор: ${v >= 0 ? "+" : ""}${v.toFixed(1)}`;
     if (tr.endSlope !== null)
-      text += ` · Тренд (${SCALE_NAMES[scale]}): ${tr.endSlope >= 0 ? "+" : ""}${tr.endSlope.toFixed(1)}/сутки`;
+      text += ` · Тренд: ${tr.endSlope >= 0 ? "+" : ""}${tr.endSlope.toFixed(1)}/сутки`;
     document.getElementById("stats").textContent = text + " Птички/сутки";
   }
 
-  sel.addEventListener("change", () => draw(+sel.value));
-  scaleSel.addEventListener("change", () => draw(+sel.value));
+  [sel, scaleSel, trendTypeSel, smoothTypeSel, winSel].forEach(el =>
+    el.addEventListener("change", () => draw(+sel.value)));
   draw(N - 1);
 }
 
