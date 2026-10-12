@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Птички — динамика и вектор</title>
+<title>Птички — динамика, вектор и прогноз пика</title>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <style>
   body { font-family: system-ui, Arial, sans-serif; max-width: 1100px;
@@ -14,15 +14,30 @@
               background: #f5f5f5; border-radius: 8px; padding: 10px 14px; }
   select { font-size: 1rem; padding: 4px 8px; }
   #stats { font-size: .95rem; font-weight: 600; flex-basis: 100%; }
-  #chart, #chartVec { margin-top: 10px; }
+  #chart, #chartVec, #chartProb { margin-top: 10px; }
   .note { color: #888; font-size: .8rem; margin-top: 8px; }
+
+  /* ===== Блок прогноза ===== */
+  .forecast { margin-top: 12px; border-radius: 10px; padding: 14px 18px;
+              background: #f4f9ff; border: 1px solid #cfe1f5; }
+  .forecast .lab { font-size: .85rem; color: #556; }
+  .forecast .big { font-size: 1.9rem; font-weight: 700; margin: 2px 0 2px; }
+  .forecast .qual { font-size: .95rem; font-weight: 600; }
+  .forecast .meta { font-size: .78rem; color: #778; margin-top: 4px; }
+  .bar { height: 8px; border-radius: 4px; background: #e2e8f0; margin-top: 8px; overflow: hidden; }
+  .bar > div { height: 100%; border-radius: 4px; transition: width .4s; }
+  .c-low  { color: #2ca02c; } .c-mid  { color: #b8860b; }
+  .c-high { color: #d62728; } .c-vhigh{ color: #8b0000; }
+  .b-low  { background: #2ca02c; } .b-mid  { background: #d7a500; }
+  .b-high { background: #d62728; } .b-vhigh{ background: #8b0000; }
 </style>
+<base target="_blank">
 <base target="_blank">
 </head>
 <body>
 
 <h1>Сбитые птички</h1>
-<div class="sub">Настраиваемые сглаживание и тренды · вектор изменения · данные: <a href="https://docs.google.com/spreadsheets/d/1K1aSN9d0JA44ruQOIPh9fwgZlKsRBhSMqaK0KDzOtsw/edit?usp=sharing">Google-таблица</a></div>
+<div class="sub">Настраиваемые сглаживание и тренды · вектор изменения · прогноз пика · данные: <a href="https://docs.google.com/spreadsheets/d/1K1aSN9d0JA44ruQOIPh9fwgZlKsRBhSMqaK0KDzOtsw/edit?usp=sharing">Google-таблица</a></div>
 
 <div class="controls">
   <label>Дата среза:
@@ -58,13 +73,19 @@
   <span id="stats">Загружаю данные из Google Sheets…</span>
 </div>
 
+<div id="forecast" class="forecast" style="display:none"></div>
+
 <div id="chart"></div>
 <div id="chartVec"></div>
-<p class="note">«Вектор» — изменение сглаженной линии за сутки, Птички/сутки.
+<div id="chartProb"></div>
+<p class="note">«Вектор» — изменение сглаженной линии за сутки.
 Красная линия — сглаживание (среднее или скользящая регрессия по выбранному окну).
 Зелёные пунктирные сегменты — тренд выбранного масштаба и вида (разрывы между блоками — смена режима).
 График перестраивается так, каким он был бы на выбранную дату (lookback). Ползунок под верхним графиком — масштаб оси X.
 Обновления в таблице появляются на графике с задержкой 1–5 минут (кэш Google).</p>
+<p class="note"><b>Прогноз пика.</b> Нижний график — вероятность того, что завтра вектор превысит локальный пик по логистической регрессии на признаках: вектор, ускорение тренда,
+«пружина» (затишье за 3 дня) и день недели. Модель переобучается на каждый день строго на прошлом.
+Вероятность — не гарантия, а калиброванная оценка, как «выпадение осадков» в прогнозе погоды.</p>
 
 <script>
 // ================= Настройки =================
@@ -72,6 +93,13 @@ const SHEET_ID = "1K1aSN9d0JA44ruQOIPh9fwgZlKsRBhSMqaK0KDzOtsw";
 const SHEET_CSV = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
 const RUBICON = "2026-08-13";
 const SCALE_NAMES = { 7: "неделя", 14: "2 недели", 30: "месяц", 0: "весь период" };
+
+// Параметры модели прогноза
+const PEAK_SIGMA = 1.5;  // порог «истинного пика»: вектор > μ + 1.5σ
+const RIDGE = 1.0;       // регуляризация (защита от переобучения)
+const TRAIN_MAX = 365;   // максимальный lookback обучения, дней
+const MIN_TRAIN = 30;    // минимум истории для обучения
+const N_NEWTON = 40;     // итерации обучения
 
 // ================= Чтение Google Sheets =================
 
@@ -218,6 +246,148 @@ function blockTrends(values, block, mode) {
   return { xs, ys, endSlope };
 }
 
+// ================= Модель прогноза пика (логистическая регрессия) =================
+
+function sigmoid(z) { return 1 / (1 + Math.exp(-z)); }
+
+function meanStd(a) {
+  const m = a.reduce((s, x) => s + x, 0) / a.length;
+  const v = a.reduce((s, x) => s + (x - m) * (x - m), 0) / Math.max(1, a.length - 1);
+  return [m, Math.sqrt(v)];
+}
+
+// Решение системы n×n методом Гаусса
+function solveN(A, b) {
+  const n = b.length;
+  const M = A.map((row, i) => [...row, b[i]]);
+  for (let col = 0; col < n; col++) {
+    let piv = col;
+    for (let r = col + 1; r < n; r++)
+      if (Math.abs(M[r][col]) > Math.abs(M[piv][col])) piv = r;
+    [M[col], M[piv]] = [M[piv], M[col]];
+    const d = M[col][col];
+    if (Math.abs(d) < 1e-12) return null;
+    for (let c = col; c <= n; c++) M[col][c] /= d;
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const f = M[r][col];
+      for (let c = col; c <= n; c++) M[r][c] -= f * M[col][c];
+    }
+  }
+  return M.map(row => row[n]);
+}
+
+// Обучение логистической регрессии (Ньютон-Рафсон с ridge-регуляризацией).
+// X — строки вида [1, x1, ..., xp], y — 0/1.
+function trainLogistic(X, y) {
+  const p = X[0].length, m = X.length;
+  const beta = new Array(p).fill(0);
+  for (let it = 0; it < N_NEWTON; it++) {
+    const H = Array.from({ length: p }, () => new Array(p).fill(0));
+    const g = new Array(p).fill(0);
+    for (let i = 0; i < m; i++) {
+      let z = 0;
+      for (let j = 0; j < p; j++) z += X[i][j] * beta[j];
+      const pr = sigmoid(z);
+      const w = Math.max(pr * (1 - pr), 1e-6);
+      for (let a = 0; a < p; a++) {
+        g[a] += X[i][a] * (y[i] - pr);
+        const xa = X[i][a];
+        for (let b = a; b < p; b++) H[a][b] += w * xa * X[i][b];
+      }
+    }
+    for (let a = 0; a < p; a++) {
+      for (let b = 0; b < a; b++) H[a][b] = H[b][a];
+      H[a][a] += RIDGE;
+      g[a] -= RIDGE * beta[a];
+    }
+    const step = solveN(H, g);
+    if (!step) break;
+    let norm = 0;
+    for (let a = 0; a < p; a++) { beta[a] += step[a]; norm += step[a] * step[a]; }
+    if (norm < 1e-10) break;
+  }
+  return beta;
+}
+
+// Наклон блокового тренда в конкретный день i (тот же тренд, что на графике)
+function blockSlopeAt(values, i, block, mode) {
+  if (block === 0) {
+    if (values.length < 5) return null;
+    if (mode === "quad") {
+      const [Aq, Bq, , t0] = quadFit(values);
+      return 2 * Aq * (i - t0) + Bq;
+    }
+    return linFit(values)[0];
+  }
+  const start = Math.floor(i / block) * block;
+  const b = values.slice(start, start + block);
+  if (b.length < 5) return null;
+  if (mode === "quad") {
+    const [Aq, Bq, , t0] = quadFit(b);
+    return 2 * Aq * (i - start - t0) + Bq;
+  }
+  return linFit(b)[0];
+}
+
+// Построение обучающих строк: признаки дня i + целевая переменная (пик на i+1)
+function buildModelRows(values, dates, w, smMode, scale, trendMode) {
+  const sm = smooth(values, w, smMode);
+  const vec = sm.map((v, i) => (v === null || sm[i-1] === null) ? null : v - sm[i-1]);
+  const vv = vec.filter(v => v !== null);
+  if (vv.length < 20) return null;
+  const [mu, sd] = meanStd(vv);
+  const thr = mu + PEAK_SIGMA * sd;
+  const slope = values.map((_, i) => blockSlopeAt(values, i, scale, trendMode));
+
+  const rows = [];
+  for (let i = 0; i < values.length; i++) {
+    if (vec[i] === null || vec[i-1] === null) continue;
+    if (slope[i] === null || slope[i-1] === null) continue;
+    let s = 0, c = 0;
+    for (const k of [i-2, i-1, i])
+      if (k >= 0 && vec[k] !== null) { s += Math.min(0, vec[k]); c++; }
+    const damp = c ? -s / c : 0;                       // «пружина»: сжатие за 3 дня
+    const dow = new Date(dates[i] + "T12:00:00").getDay();
+    const ang = 2 * Math.PI * dow / 7;
+    let y = null;
+    if (i + 1 < values.length && vec[i+1] !== null)
+      y = vec[i+1] > thr ? 1 : 0;
+    rows.push({ i, x: [vec[i], slope[i] - slope[i-1], damp, Math.sin(ang), Math.cos(ang)], y });
+  }
+  return { rows, mu, sd, thr };
+}
+
+// Обучение на строках с известным y (последние TRAIN_MAX), предсказание для xToday
+function fitPredict(trainRows, xToday) {
+  const train = trainRows.slice(-TRAIN_MAX);
+  if (train.length < MIN_TRAIN) return null;
+  const p = xToday.length;
+  const mu = new Array(p), sd = new Array(p);
+  for (let j = 0; j < p; j++) {
+    const [m, s] = meanStd(train.map(r => r.x[j]));
+    mu[j] = m; sd[j] = s > 1e-9 ? s : 1;
+  }
+  const X = train.map(r => [1, ...r.x.map((v, j) => (v - mu[j]) / sd[j])]);
+  const beta = trainLogistic(X, train.map(r => r.y));
+  let z = beta[0];
+  for (let j = 0; j < p; j++) z += beta[j+1] * (xToday[j] - mu[j]) / sd[j];
+  return { p: sigmoid(z), n: train.length };
+}
+
+function probLabel(p) {
+  if (p < 0.25) return ["низкая", "c-low", "b-low"];
+  if (p < 0.50) return ["умеренная", "c-mid", "b-mid"];
+  if (p < 0.75) return ["повышенная", "c-high", "b-high"];
+  return ["высокая", "c-vhigh", "b-vhigh"];
+}
+
+function addDays(dateStr, k) {
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() + k);
+  return d.toISOString().slice(0, 10);
+}
+
 // ================= Отрисовка =================
 
 async function main() {
@@ -289,6 +459,68 @@ async function main() {
       margin: { t: 10 },
       height: 220
     }, { responsive: true, displaylogo: false });
+
+    // ---------- Прогноз пика ----------
+    const model = buildModelRows(sub, subDates, w, smMode, scale, trendMode);
+    const fc = document.getElementById("forecast");
+    const probX = [], probY = [];
+
+    if (!model || model.rows.length === 0) {
+      fc.style.display = "block";
+      fc.innerHTML = `<div class="lab">Прогноз пика</div>
+        <div class="meta">Недостаточно истории для обучения модели (нужно ≥ ${MIN_TRAIN} дней).</div>`;
+    } else {
+      // out-of-sample: каждая точка предсказана моделью, обученной только на прошлом
+      for (let r = 0; r < model.rows.length; r++) {
+        const prev = [];
+        for (let q = 0; q < r; q++)
+          if (model.rows[q].y !== null) prev.push(model.rows[q]);
+        const fp = fitPredict(prev, model.rows[r].x);
+        if (fp) { probX.push(subDates[model.rows[r].i]); probY.push(100 * fp.p); }
+      }
+
+      const today = model.rows[model.rows.length - 1];
+      const hist = model.rows.filter(r => r.y !== null);
+      const fpT = fitPredict(hist, today.x);
+
+      if (!fpT) {
+        fc.style.display = "block";
+        fc.innerHTML = `<div class="lab">Прогноз пика</div>
+          <div class="meta">Накоплено ${hist.length} обучающих дней — модели нужно ≥ ${MIN_TRAIN}. Продолжайте вести таблицу.</div>`;
+      } else {
+        const pct = 100 * fpT.p;
+        const [label, cls, bcls] = probLabel(fpT.p);
+        fc.style.display = "block";
+        fc.innerHTML = `
+          <div class="lab">Вероятность нового пика завтра, ${addDays(dates[idx], 1)}</div>
+          <div class="big ${cls}">${pct.toFixed(0)}% <span class="qual">— ${label}</span></div>
+          <div class="bar"><div class="${bcls}" style="width:${Math.max(2, pct).toFixed(0)}%"></div></div>
+          <div class="meta">Логистическая регрессия · обучено на ${fpT.n} днях (строго до ${dates[idx]}) ·
+            пик = вектор выше μ+${PEAK_SIGMA}σ (порог ${model.thr.toFixed(1)} Птички/сутки) ·
+            признаки: вектор, ускорение тренда, «пружина», день недели</div>`;
+      }
+
+      const tomorrowP = fpT ? 100 * fpT.p : null;
+      const traces = [
+        { x: probX, y: probY, mode: "lines", name: "P(пик завтра), out-of-sample",
+          line: { color: "#9467bd", width: 2 } },
+        { x: [dates[idx]], y: [tomorrowP], mode: "markers",
+          name: "Прогноз на завтра",
+          marker: { size: 12, symbol: "star", color: "#d62728" } }
+      ];
+      Plotly.react("chartProb", traces, {
+        title: { text: "Вероятность пика на следующий день (модель знает только прошлое)" },
+        yaxis: { title: "Вероятность, %", range: [0, 100] },
+        shapes: [
+          { type: "line", x0: probX[0], x1: dates[idx], y0: 50, y1: 50,
+            line: { dash: "dot", color: "#888" } },
+          ...shapes
+        ],
+        showlegend: false,
+        margin: { t: 50 },
+        height: 260
+      }, { responsive: true, displaylogo: false });
+    }
 
     const lvl = sm[idx], v = vec[idx];
     let text = lvl === null ? "Недостаточно данных для сглаживания"
