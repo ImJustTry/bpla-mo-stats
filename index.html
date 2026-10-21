@@ -433,7 +433,7 @@ async function main() {
     ], {
       title: { text: `Срез на ${dates[idx]}` },
       xaxis: { title: "Дата окончания оперативного окна", rangeslider: {} },
-      yaxis: { title: "Птички за 24-часовое окно" },
+      yaxis: { title: "24-часовое окно" },
       hovermode: "x unified",
       legend: { orientation: "h", y: 1.14 },
       shapes,
@@ -515,10 +515,10 @@ async function main() {
 
     const lvl = sm[idx], v = vec[idx];
     let text = lvl === null ? "Недостаточно данных для сглаживания"
-      : `Уровень: ${lvl.toFixed(0)} · Вектор: ${v >= 0 ? "+" : ""}${v.toFixed(1)}`;
+      : `Уровень: ${lvl.toFixed(0)} ··· Вектор: ${v >= 0 ? "+" : ""}${v.toFixed(1)}`;
     if (tr.endSlope !== null)
-      text += ` · Тренд: ${tr.endSlope >= 0 ? "+" : ""}${tr.endSlope.toFixed(1)}/сутки`;
-    document.getElementById("stats").textContent = text + " Птички/сутки";
+      text += ` ··· Тренд: ${tr.endSlope >= 0 ? "+" : ""}${tr.endSlope.toFixed(1)}`;
+    document.getElementById("stats").textContent = text;
   }
 
   [sel, scaleSel, trendTypeSel, smoothTypeSel, winSel].forEach(el =>
