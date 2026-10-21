@@ -36,14 +36,14 @@
 </head>
 <body>
 
-<h1>Сбитые птички</h1>
-<div class="sub">Настраиваемые сглаживание и тренды · вектор изменения · прогноз пика · данные: <a href="https://docs.google.com/spreadsheets/d/1K1aSN9d0JA44ruQOIPh9fwgZlKsRBhSMqaK0KDzOtsw/edit?usp=sharing">Google-таблица</a></div>
+<h1>Birds</h1>
+<div class="sub">Настройки и данные: <a href="https://docs.google.com/spreadsheets/d/1K1aSN9d0JA44ruQOIPh9fwgZlKsRBhSMqaK0KDzOtsw/edit?usp=sharing">GS</a></div>
 
 <div class="controls">
-  <label title="Откат для проверки модели на прошлом; рабочий вид — всегда последняя дата">Дата среза (проверка на прошлом):
+  <label title="Проверка модели на прошлом; вид — всегда последняя дата">Срез на дату:
     <select id="dateSel"></select>
   </label>
-  <label>Масштаб тренда:
+  <label>Масштаб:
     <select id="scaleSel">
       <option value="7">Неделя</option>
       <option value="14">2 недели</option>
@@ -51,7 +51,7 @@
       <option value="0" selected>Весь период</option>
     </select>
   </label>
-  <label>Вид тренда:
+  <label>Вид:
     <select id="trendTypeSel">
       <option value="lin">Линейный</option>
       <option value="quad" selected>Квадратичный</option>
@@ -70,7 +70,7 @@
       <option value="30">30 дн.</option>
     </select>
   </label>
-  <span id="stats">Загружаю данные из Google Sheets…</span>
+  <span id="stats">Загружаю данные из GS…</span>
 </div>
 
 <div id="forecast" class="forecast" style="display:none"></div>
@@ -78,18 +78,6 @@
 <div id="chart"></div>
 <div id="chartVec"></div>
 <div id="chartProb"></div>
-<p class="note">«Вектор» — изменение сглаженной линии за сутки, Птички/сутки.
-Красная линия — сглаживание (среднее или скользящая регрессия по выбранному окну).
-Зелёные пунктирные сегменты — тренд выбранного масштаба и вида (разрывы между блоками — смена режима).
-График перестраивается так, каким он был бы на выбранную дату (lookback). Ползунок под верхним графиком — масштаб оси X.
-Обновления в таблице появляются на графике с задержкой 1–5 минут (кэш Google).</p>
-<p class="note"><b>Прогноз пика.</b> Нижний график — вероятность того, что завтра вектор превысит μ+1.5σ
-(«истинный локальный пик»), по логистической регрессии на признаках: вектор, ускорение тренда,
-«пружина» (затишье за 3 дня) и день недели. Модель переобучается на каждый день строго на прошлом
-(линия на графике — out-of-sample: каждая точка предсказана без использования будущего).
-Дата в таблице — начало суточного окна: запись «11 окт» вносится 12-го и покрывает 11→12.
-Поэтому прогноз относится к следующему окну, данные за которое появятся в таблице на следующий день внесения.
-Вероятность — не гарантия, а калиброванная оценка, как «выпадение осадков» в прогнозе погоды.</p>
 
 <script>
 // ================= Настройки =================
@@ -497,12 +485,10 @@ async function main() {
         const d1 = addDays(dates[idx], 1), d2 = addDays(dates[idx], 2);
         fc.style.display = "block";
         fc.innerHTML = `
-          <div class="lab">Вероятность пика в следующем суточном окне (${d1} → ${d2})</div>
+          <div class="lab">Вероятность увеличения интенсивности (${d1} → ${d2})</div>
           <div class="big ${cls}">${pct.toFixed(0)}% <span class="qual">— ${label}</span></div>
           <div class="bar"><div class="${bcls}" style="width:${Math.max(2, pct).toFixed(0)}%"></div></div>
-          <div class="meta">Запись за это окно появится в таблице ${d2} · логистическая регрессия · обучено на ${fpT.n} днях (строго до ${dates[idx]}) ·
-            пик = вектор выше μ+${PEAK_SIGMA}σ (порог ${model.thr.toFixed(1)} Птички/сутки) ·
-            признаки: вектор, ускорение тренда, «пружина», день недели</div>`;
+          `;
       }
 
       const tomorrowP = fpT ? 100 * fpT.p : null;
@@ -514,7 +500,7 @@ async function main() {
           marker: { size: 12, symbol: "star", color: "#d62728" } }
       ];
       Plotly.react("chartProb", traces, {
-        title: { text: "Вероятность пика в следующем суточном окне (модель знает только прошлое)" },
+        title: { text: "График вероятности" },
         yaxis: { title: "Вероятность, %", range: [0, 100] },
         shapes: [
           { type: "line", x0: probX[0], x1: dates[idx], y0: 50, y1: 50,
