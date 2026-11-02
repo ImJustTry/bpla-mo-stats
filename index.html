@@ -3,66 +3,161 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Птички — динамика, вектор и прогноз пика</title>
+<title>Birds — динамика и вектор</title>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <style>
-  body { font-family: system-ui, Arial, sans-serif; max-width: 1100px;
-         margin: 0 auto; padding: 16px; color: #222; }
-  h1 { font-size: 1.35rem; margin-bottom: 4px; }
-  .sub { color: #666; font-size: .9rem; margin-bottom: 14px; }
-  .controls { display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
-              background: #f5f5f5; border-radius: 8px; padding: 10px 14px; }
-  select { font-size: 1rem; padding: 4px 8px; }
-  #stats { font-size: .95rem; font-weight: 600; flex-basis: 100%; }
-  #chart, #chartVec { margin-top: 10px; }
-  .note { color: #888; font-size: .8rem; margin-top: 8px; }
+  :root {
+    --bg: #f3f5f8;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --muted: #64748b;
+    --accent: #2563eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 24px 16px 48px;
+  }
+  .container { max-width: 1060px; margin: 0 auto; }
 
+  /* ===== Шапка ===== */
+  .site-header { margin-bottom: 20px; }
+  .site-header h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .site-header .sub { color: var(--muted); font-size: .9rem; }
+  .site-header .sub a { color: var(--accent); text-decoration: none; }
+  .site-header .sub a:hover { text-decoration: underline; }
+
+  /* ===== Панель настроек ===== */
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .05);
+  }
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+  }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field > span {
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--muted);
+  }
+  select {
+    font-size: .92rem;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text);
+    width: 100%;
+  }
+  select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  #stats {
+    margin-top: 16px;
+    padding: 10px 14px;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: .92rem;
+    font-weight: 600;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+  }
+  #stats .dim { color: var(--muted); font-weight: 500; }
+
+  /* ===== Графики ===== */
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .05);
+  }
+  .chart-card h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  .chart-card .cap { color: var(--muted); font-size: .8rem; margin: 0 0 8px; }
 </style>
-<base target="_blank">
-<base target="_blank">
 <base target="_blank">
 </head>
 <body>
+<div class="container">
 
-<h1>Birds</h1>
-<div class="sub">Настройки и данные: <a href="https://docs.google.com/spreadsheets/d/1K1aSN9d0JA44ruQOIPh9fwgZlKsRBhSMqaK0KDzOtsw">GS</a></div>
+  <header class="site-header">
+    <h1>Birds</h1>
+    <div class="sub">Настройки и данные: <a href="https://docs.google.com/spreadsheets/d/1K1aSN9d0JA44ruQOIPh9fwgZlKsRBhSMqaK0KDzOtsw/edit?usp=sharing">GS</a></div>
+  </header>
 
-<div class="controls">
-  <label title="Откат даты: посмотреть, как выглядел график в прошлом">Срез на дату:
-    <select id="dateSel"></select>
-  </label>
-  <label>Масштаб:
-    <select id="scaleSel">
-      <option value="7">Неделя</option>
-      <option value="14">2 недели</option>
-      <option value="30">Месяц</option>
-      <option value="0" selected>Весь период</option>
-    </select>
-  </label>
-  <label>Вид:
-    <select id="trendTypeSel">
-      <option value="lin">Линейный</option>
-      <option value="quad" selected>Квадратичный</option>
-    </select>
-  </label>
-  <label>Сглаживание:
-    <select id="smoothTypeSel">
-      <option value="sma">Скользящее среднее</option>
-      <option value="quad" selected>Квадратичная регрессия</option>
-    </select>
-  </label>
-  <label>Окно сглаживания:
-    <select id="winSel">
-      <option value="7">7 дн.</option>
-      <option value="14" selected>14 дн.</option>
-      <option value="30">30 дн.</option>
-    </select>
-  </label>
-  <span id="stats">Загружаю данные из GS…</span>
+  <section class="panel">
+    <div class="controls">
+      <label class="field" title="Откат даты: посмотреть, как выглядел график в прошлом">
+        <span>Срез на дату</span>
+        <select id="dateSel"></select>
+      </label>
+      <label class="field">
+        <span>Масштаб</span>
+        <select id="scaleSel">
+          <option value="7">Неделя</option>
+          <option value="14">2 недели</option>
+          <option value="30">Месяц</option>
+          <option value="0" selected>Весь период</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Вид тренда</span>
+        <select id="trendTypeSel">
+          <option value="lin">Линейный</option>
+          <option value="quad" selected>Квадратичный</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Сглаживание</span>
+        <select id="smoothTypeSel">
+          <option value="sma">Скользящее среднее</option>
+          <option value="quad" selected>Квадратичная регрессия</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Окно сглаживания</span>
+        <select id="winSel">
+          <option value="7">7 дн.</option>
+          <option value="14" selected>14 дн.</option>
+          <option value="30">30 дн.</option>
+        </select>
+      </label>
+    </div>
+    <div id="stats">Загружаю данные из GS…</div>
+  </section>
+
+  <section class="chart-card">
+    <h2 id="chartTitle">Динамика</h2>
+    <p class="cap">Красная линия — сглаживание, зелёный пунктир — блоковый тренд (разрывы — смена режима). Ползунок под графиком — масштаб оси X.</p>
+    <div id="chart"></div>
+  </section>
+
+  <section class="chart-card">
+    <h2 id="vecTitle">Вектор</h2>
+    <p class="cap">Изменение сглаженной линии за сутки, Птички/сутки. Зелёные столбики — рост, красные — снижение.</p>
+    <div id="chartVec"></div>
+  </section>
+
 </div>
-
-<div id="chart"></div>
-<div id="chartVec"></div>
 
 <script>
 // ================= Настройки =================
@@ -258,6 +353,8 @@ async function main() {
       ? [{ type: "line", x0: RUBICON, x1: RUBICON, y0: 0, y1: 1, yref: "paper",
            line: { dash: "dot", width: 2 } }] : [];
 
+    document.getElementById("chartTitle").textContent = `Динамика · срез на ${dates[idx]}`;
+
     Plotly.react("chart", [
       { x: dates, y: values, mode: "markers", name: "Суточная сводка",
         marker: { size: 4, color: "#1f77b4" }, opacity: 0.55 },
@@ -267,13 +364,12 @@ async function main() {
         mode: "lines", name: trendName,
         line: { color: "#2ca02c", width: 2, dash: "dash" }, connectgaps: false }
     ], {
-      title: { text: `Срез на ${dates[idx]}` },
       xaxis: { title: "Дата окончания оперативного окна", rangeslider: {} },
-      yaxis: { title: "24-часовое окно" },
+      yaxis: { title: "Птички за 24-часовое окно" },
       hovermode: "x unified",
-      legend: { orientation: "h", y: 1.30 },
+      legend: { orientation: "h", y: 1.18, x: 0 },
       shapes,
-      margin: { t: 90 },
+      margin: { t: 30, r: 20, b: 0, l: 60 },
       height: 500
     }, { responsive: true, displaylogo: false });
 
@@ -284,16 +380,18 @@ async function main() {
     }], {
       yaxis: { title: "Вектор, Птички/сутки" },
       showlegend: false,
-      margin: { t: 10 },
+      margin: { t: 10, r: 20, b: 40, l: 60 },
       height: 220
     }, { responsive: true, displaylogo: false });
 
     const lvl = sm[idx], v = vec[idx];
     let text = lvl === null ? "Недостаточно данных для сглаживания"
-      : `Уровень: ${lvl.toFixed(0)} ··· Вектор: ${v >= 0 ? "+" : ""}${v.toFixed(1)}`;
+      : `<span>Уровень: ${lvl.toFixed(0)}</span>`;
+    if (v !== null && v !== undefined)
+      text += `<span class="dim">Вектор: ${v >= 0 ? "+" : ""}${v.toFixed(1)}</span>`;
     if (tr.endSlope !== null)
-      text += ` ··· Тренд: ${tr.endSlope >= 0 ? "+" : ""}${tr.endSlope.toFixed(1)}`;
-    document.getElementById("stats").textContent = text;
+      text += `<span class="dim">Тренд: ${tr.endSlope >= 0 ? "+" : ""}${tr.endSlope.toFixed(1)}/сутки</span>`;
+    document.getElementById("stats").innerHTML = text;
   }
 
   [sel, scaleSel, trendTypeSel, smoothTypeSel, winSel].forEach(el =>
