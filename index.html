@@ -111,15 +111,6 @@
         <select id="dateSel"></select>
       </label>
       <label class="field">
-        <span>Масштаб</span>
-        <select id="scaleSel">
-          <option value="7">Неделя</option>
-          <option value="14">2 недели</option>
-          <option value="30">Месяц</option>
-          <option value="0" selected>Весь период</option>
-        </select>
-      </label>
-      <label class="field">
         <span>Вид тренда</span>
         <select id="trendTypeSel">
           <option value="lin">Линейный</option>
@@ -147,7 +138,7 @@
 
   <section class="chart-card">
     <h2 id="chartTitle">Динамика</h2>
-    <p class="cap">Красная линия — сглаживание, зелёный пунктир — тренд по скользящему окну выбранного масштаба. Ползунок под графиком — масштаб оси X.</p>
+    <p class="cap">Красная линия — сглаживание, зелёный пунктир — тренд за весь период. Ползунок под графиком — масштаб оси X.</p>
     <div id="chart"></div>
   </section>
 
@@ -164,7 +155,6 @@
 const SHEET_ID = "1K1aSN9d0JA44ruQOIPh9fwgZlKsRBhSMqaK0KDzOtsw";
 const SHEET_CSV = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
 const RUBICON = "2026-08-13";
-const SCALE_NAMES = { 7: "неделя", 14: "2 недели", 30: "месяц", 0: "весь период" };
 
 // ================= Чтение Google Sheets =================
 
@@ -290,7 +280,22 @@ function smooth(values, w, mode) {
 function windowTrend(values, win, mode) {
   const ys = new Array(values.length).fill(null);
   let endSlope = null;
-  const W = win === 0 ? values.length : win;
+  if (win === 0) {          // весь период: одна линия на все дни
+    if (values.length >= 5) {
+      const n = values.length;
+      if (mode === "quad") {
+        const [Aq, Bq, Cq, t0] = quadFit(values);
+        for (let t = 0; t < n; t++) { const tc = t - t0; ys[t] = Aq*tc*tc + Bq*tc + Cq; }
+        endSlope = 2 * Aq * (n - 1 - t0) + Bq;
+      } else {
+        const [a, c] = linFit(values);
+        for (let t = 0; t < n; t++) ys[t] = a * t + c;
+        endSlope = a;
+      }
+    }
+    return { ys, endSlope };
+  }
+  const W = win;
   for (let j = W - 1; j < values.length; j++) {
     const b = values.slice(j - W + 1, j + 1);
     if (b.length < 5) break;
@@ -325,14 +330,12 @@ async function main() {
     if (i === N - 1) opt.selected = true;
     sel.appendChild(opt);
   });
-  const scaleSel = document.getElementById("scaleSel");
   const trendTypeSel = document.getElementById("trendTypeSel");
   const smoothTypeSel = document.getElementById("smoothTypeSel");
   const winSel = document.getElementById("winSel");
 
   function draw(idx) {
-    const scale = +scaleSel.value;
-    const trendMode = trendTypeSel.value;
+      const trendMode = trendTypeSel.value;
     const smMode = smoothTypeSel.value;
     const w = +winSel.value;
 
@@ -340,10 +343,10 @@ async function main() {
     const subDates = dates.slice(0, idx + 1);
     const sm = smooth(sub, w, smMode);
     const vec = sm.map((v, i) => (v === null || sm[i-1] === null) ? null : v - sm[i-1]);
-    const tr = windowTrend(sub, scale, trendMode);
+    const tr = windowTrend(sub, 0, trendMode);
 
     const trendName = (trendMode === "quad" ? "Квадратичный тренд" : "Линейный тренд")
-      + ` (${SCALE_NAMES[scale]})`;
+      + " (весь период)";
     const smName = (smMode === "quad" ? `Скользящая регрессия ${w} дн.` : `Скользящее среднее ${w} дн.`);
 
     const rubIdx = dates.indexOf(RUBICON);
@@ -392,7 +395,7 @@ async function main() {
     document.getElementById("stats").innerHTML = text;
   }
 
-  [sel, scaleSel, trendTypeSel, smoothTypeSel, winSel].forEach(el =>
+  [sel, trendTypeSel, smoothTypeSel, winSel].forEach(el =>
     el.addEventListener("change", () => draw(+sel.value)));
   draw(N - 1);
 }
