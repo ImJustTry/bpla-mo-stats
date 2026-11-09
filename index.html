@@ -147,7 +147,7 @@
 
   <section class="chart-card">
     <h2 id="chartTitle">Динамика</h2>
-    <p class="cap">Красная линия — сглаживание, зелёный пунктир — блоковый тренд (разрывы — смена режима). Ползунок под графиком — масштаб оси X.</p>
+    <p class="cap">Красная линия — сглаживание, зелёный пунктир — тренд по скользящему окну выбранного масштаба. Ползунок под графиком — масштаб оси X.</p>
     <div id="chart"></div>
   </section>
 
@@ -283,32 +283,30 @@ function smooth(values, w, mode) {
   return out;
 }
 
-// Тренды блоками по `block` дней (block = 0 — один блок на весь ряд).
-// mode: "lin" | "quad". Возвращает линии и наклон в конце последнего блока.
-function blockTrends(values, block, mode) {
-  const size = block === 0 ? values.length : block;
-  const xs = [], ys = [];
+// Тренд скользящим окном по `win` днях (win = 0 — одна линия на весь ряд).
+// mode: "lin" | "quad". Точка дня i — значение линии/параболы, построенной
+// на окне [i-win+1, i], на правом крае окна. Линия непрерывная, без разрывов.
+// Первые win-1 дней — null (окну не из чего собраться). endSlope — наклон в последний день.
+function windowTrend(values, win, mode) {
+  const ys = new Array(values.length).fill(null);
   let endSlope = null;
-  for (let start = 0; start < values.length; start += size) {
-    const b = values.slice(start, start + size);
+  const W = win === 0 ? values.length : win;
+  for (let j = W - 1; j < values.length; j++) {
+    const b = values.slice(j - W + 1, j + 1);
     if (b.length < 5) break;
     const n = b.length;
     if (mode === "quad") {
       const [Aq, Bq, Cq, t0] = quadFit(b);
-      for (let t = 0; t < n; t++) {
-        const tc = t - t0;
-        xs.push(start + t);
-        ys.push(Aq*tc*tc + Bq*tc + Cq);
-      }
-      endSlope = 2 * Aq * (n - 1 - t0) + Bq;
+      const t = n - 1 - t0;
+      ys[j] = Aq*t*t + Bq*t + Cq;
+      if (j === values.length - 1) endSlope = 2 * Aq * t + Bq;
     } else {
       const [a, c] = linFit(b);
-      for (let t = 0; t < n; t++) { xs.push(start + t); ys.push(a * t + c); }
-      endSlope = a;
+      ys[j] = a * (n - 1) + c;
+      if (j === values.length - 1) endSlope = a;
     }
-    xs.push(null); ys.push(null);
   }
-  return { xs, ys, endSlope };
+  return { ys, endSlope };
 }
 
 // ================= Отрисовка =================
@@ -342,7 +340,7 @@ async function main() {
     const subDates = dates.slice(0, idx + 1);
     const sm = smooth(sub, w, smMode);
     const vec = sm.map((v, i) => (v === null || sm[i-1] === null) ? null : v - sm[i-1]);
-    const tr = blockTrends(sub, scale, trendMode);
+    const tr = windowTrend(sub, scale, trendMode);
 
     const trendName = (trendMode === "quad" ? "Квадратичный тренд" : "Линейный тренд")
       + ` (${SCALE_NAMES[scale]})`;
@@ -360,7 +358,7 @@ async function main() {
         marker: { size: 4, color: "#1f77b4" }, opacity: 0.55 },
       { x: subDates, y: sm, mode: "lines", name: smName,
         line: { color: "#d62728", width: 3 }, connectgaps: false },
-      { x: tr.xs.map(i => i === null ? null : subDates[i]), y: tr.ys,
+      { x: subDates, y: tr.ys,
         mode: "lines", name: trendName,
         line: { color: "#2ca02c", width: 2, dash: "dash" }, connectgaps: false }
     ], {
